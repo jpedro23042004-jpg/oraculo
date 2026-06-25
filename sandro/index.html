@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oráculo IA — adivinha o personagem</title>
+<style>
+  :root{
+    --ink:#170E22;--ink-2:#1F1430;--surface:#291A3D;--surface-2:#33214B;--line:#3F2A5C;
+    --orchid:#E368C9;--orchid-2:#A86BE8;--gold:#F2C46B;--teal:#5BD6C8;
+    --text:#EFE7F6;--muted:#A793C0;--muted-2:#7C6592;
+    --mono:ui-monospace,"Cascadia Code","SF Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:var(--sans);color:var(--text);
+    background:
+      radial-gradient(900px 600px at 50% -10%, #3A1F52 0%, transparent 60%),
+      radial-gradient(700px 500px at 100% 110%, #241640 0%, transparent 55%),
+      var(--ink);
+    min-height:100%;display:flex;align-items:center;justify-content:center;padding:20px;
+  }
+  .app{width:100%;max-width:520px}
+
+  header{text-align:center;margin-bottom:20px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--muted-2);margin:0 0 10px}
+  .wordmark{font-size:40px;font-weight:800;letter-spacing:-.02em;margin:0;background:linear-gradient(120deg,var(--orchid),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .tagline{color:var(--muted);font-size:14px;margin:8px 0 0}
+
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-family:var(--mono);font-size:11px}
+  .status{display:flex;align-items:center;gap:7px;color:var(--muted)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--muted-2);box-shadow:0 0 8px transparent}
+  .dot.on{background:var(--teal);box-shadow:0 0 10px var(--teal)}
+  .dot.off{background:var(--orchid-2)}
+  .switch{display:flex;align-items:center;gap:7px;color:var(--muted);cursor:pointer;user-select:none}
+  .switch input{accent-color:var(--orchid);width:15px;height:15px}
+
+  .card{background:linear-gradient(180deg,var(--surface) 0%,var(--ink-2) 100%);border:1px solid var(--line);border-radius:22px;padding:26px 22px;box-shadow:0 30px 80px -40px #000, inset 0 1px 0 #ffffff10}
+
+  .orb{width:88px;height:88px;border-radius:50%;margin:6px auto 18px;background:radial-gradient(circle at 35% 30%, #ffffff, var(--orchid) 38%, #6A2E9C 75%, #2A1444 100%);box-shadow:0 0 0 8px #E368C918, 0 0 40px #E368C955;animation:breathe 3.4s ease-in-out infinite}
+  @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+
+  .lead{text-align:center;color:var(--muted);font-size:15px;line-height:1.55;margin:0 0 22px;min-height:24px}
+  .lead strong{color:var(--text);font-weight:600}
+
+  .qcount{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted-2);text-align:center;margin:0 0 14px}
+  .question{font-size:23px;font-weight:700;line-height:1.3;text-align:center;margin:0 0 22px;min-height:62px;display:flex;align-items:center;justify-content:center}
+  .thinking{font-size:15px;font-weight:500;color:var(--orchid);animation:pulse 1.1s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+
+  .answers{display:grid;gap:10px}
+  .btn{font-family:var(--sans);font-size:16px;font-weight:600;color:var(--text);background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:14px 16px;cursor:pointer;transition:transform .08s,border-color .15s,background .15s;width:100%}
+  .btn:hover{border-color:var(--orchid);background:#3a2556}
+  .btn:active{transform:scale(.98)}
+  .btn:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn.yes{border-color:#5BD6C84d}
+  .btn.no{border-color:#E368C94d}
+  .btn.primary{background:linear-gradient(120deg,var(--orchid),var(--orchid-2));border:none;color:#fff;font-size:17px;padding:16px}
+  .btn.ghost{background:transparent}
+
+  .panel{margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}
+  .panel-title{font-family:var(--mono);font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted-2);margin:0 0 14px;display:flex;justify-content:space-between}
+  .suspect{margin-bottom:11px}
+  .suspect-row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px}
+  .suspect-name{color:var(--text);font-weight:600}
+  .suspect-pct{font-family:var(--mono);color:var(--muted)}
+  .bar{height:7px;background:#ffffff0d;border-radius:99px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--orchid-2),var(--orchid));transition:width .45s cubic-bezier(.2,.8,.2,1)}
+
+  .guess-name{font-size:30px;font-weight:800;text-align:center;margin:6px 0 4px;background:linear-gradient(120deg,var(--gold),var(--orchid));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .confidence{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:center;margin:0 0 22px}
+
+  .stat-row{display:flex;gap:12px;margin:0 0 22px}
+  .stat{flex:1;background:var(--surface-2);border:1px solid var(--line);border-radius:14px;padding:14px;text-align:center}
+  .stat-num{font-size:26px;font-weight:800;color:var(--gold)}
+  .stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-top:4px}
+
+  .field{width:100%;font-family:var(--sans);font-size:16px;color:var(--text);background:var(--ink);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+  .field:focus{outline:none;border-color:var(--orchid)}
+
+  .hidden{display:none}
+  .footnote{text-align:center;color:var(--muted-2);font-size:12px;margin-top:18px;font-family:var(--mono)}
+
+  @media (prefers-reduced-motion:reduce){.orb{animation:none}.bar-fill{transition:none}.thinking{animation:none}}
+  @media (max-width:420px){.wordmark{font-size:32px}.question{font-size:20px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <p class="eyebrow">Bayes + LLM (Llama 3.3 70B)</p>
+    <h1 class="wordmark">ORÁCULO IA</h1>
+    <p class="tagline">Pense num personagem. Eu vou descobrir quem é.</p>
+  </header>
+
+  <div class="topbar">
+    <label class="switch"><input type="checkbox" id="llm-toggle" checked>usar LLM</label>
+    <span class="status"><span class="dot" id="dot"></span><span id="status-text">aguardando…</span></span>
+  </div>
+
+  <main class="card">
+
+    <section id="screen-start">
+      <div class="orb"></div>
+      <p class="lead">Pense em qualquer <strong>personagem</strong> de jogo, anime ou filme.<br>Eu combino raciocínio probabilístico com um LLM pra ler sua mente.</p>
+      <button class="btn primary" id="btn-start">Começar</button>
+    </section>
+
+    <section id="screen-game" class="hidden">
+      <p class="qcount" id="qcount">Pergunta 1</p>
+      <div class="question" id="question">…</div>
+      <div class="answers" id="answers">
+        <button class="btn yes" data-ans="yes">Sim</button>
+        <button class="btn" data-ans="pyes">Provavelmente sim</button>
+        <button class="btn" data-ans="idk">Não sei</button>
+        <button class="btn" data-ans="pno">Provavelmente não</button>
+        <button class="btn no" data-ans="no">Não</button>
+      </div>
+      <div class="panel">
+        <p class="panel-title"><span>Suspeitas do oráculo</span><span id="conf-readout">—</span></p>
+        <div id="suspects"></div>
+      </div>
+    </section>
+
+    <section id="screen-guess" class="hidden">
+      <div class="orb"></div>
+      <p class="lead" id="guess-lead">Acho que você está pensando em…</p>
+      <div class="guess-name" id="guess-name">—</div>
+      <p class="confidence" id="guess-conf">confiança —</p>
+      <div class="answers">
+        <button class="btn primary" id="guess-yes">Acertei!</button>
+        <button class="btn ghost" id="guess-no">Não é esse</button>
+      </div>
+    </section>
+
+    <section id="screen-win" class="hidden">
+      <div class="orb"></div>
+      <p class="lead"><strong>Eu sabia.</strong> 🔮</p>
+      <div class="stat-row">
+        <div class="stat"><div class="stat-num" id="win-questions">0</div><div class="stat-label">Perguntas</div></div>
+        <div class="stat"><div class="stat-num" id="win-conf">0%</div><div class="stat-label">Confiança</div></div>
+      </div>
+      <button class="btn primary" id="btn-again">Jogar de novo</button>
+    </section>
+
+    <section id="screen-learn" class="hidden">
+      <p class="lead">Você me venceu. Quem era o personagem?<br>Me ensine — o LLM monta a ficha sozinho.</p>
+      <input class="field" id="learn-input" placeholder="Nome do personagem" autocomplete="off">
+      <button class="btn primary" id="btn-teach">Ensinar o oráculo</button>
+      <button class="btn ghost" id="btn-skip">Pular</button>
+    </section>
+
+    <section id="screen-taught" class="hidden">
+      <div class="orb"></div>
+      <p class="lead" id="taught-lead"></p>
+      <button class="btn primary" id="btn-again-2">Jogar de novo</button>
+    </section>
+
+  </main>
+
+  <p class="footnote">Bayes offline · LLM via Groq · degrada sozinho se cair a rede</p>
+</div>
+
+<script>
+const Q = [
+  ["vg","É de um videogame?"],["anime","É de anime ou mangá?"],["movie","É de filme ou quadrinhos?"],
+  ["human","É humano?"],["female","É mulher?"],["villain","É um vilão?"],
+  ["sword","Usa espada ou lâmina?"],["gun","Usa arma de fogo?"],["magic","Tem poderes mágicos ou sobrenaturais?"],
+  ["fly","Consegue voar?"],["armor","Usa armadura?"],["mask","Usa máscara ou capacete a maior parte do tempo?"],
+  ["cape","Usa capa?"],["robot","É um robô ou máquina?"],["creature","É uma criatura não-humanoide?"],
+  ["strength","É fisicamente super forte?"],["martial","Luta com artes marciais?"],["nintendo","Pertence à Nintendo?"],
+  ["japanese","É de origem japonesa?"],["giant","É gigante?"],["hairColor","Tem cabelo de cor marcante ou incomum?"]
+];
+
+function c(name,t){return {name,t};}
+let CHARACTERS = [
+  c("Mario",{vg:1,human:1,nintendo:1,japanese:1}),
+  c("Link",{vg:1,human:1,nintendo:1,japanese:1,sword:1}),
+  c("Samus Aran",{vg:1,human:1,female:1,nintendo:1,japanese:1,armor:1,gun:1,mask:1,fly:.5}),
+  c("Pikachu",{vg:1,creature:1,nintendo:1,japanese:1,hairColor:.5}),
+  c("Sonic",{vg:1,creature:1,japanese:1,hairColor:.5}),
+  c("Kratos",{vg:1,human:1,sword:1,strength:1,magic:.5,villain:.3}),
+  c("Master Chief",{vg:1,human:1,armor:1,gun:1,mask:1,strength:1}),
+  c("Lara Croft",{vg:1,human:1,female:1,gun:1}),
+  c("Geralt",{vg:1,human:1,sword:1,magic:.6,hairColor:1}),
+  c("Cloud",{vg:1,human:1,sword:1,japanese:1,hairColor:1}),
+  c("Sephiroth",{vg:1,human:1,sword:1,villain:1,japanese:1,hairColor:1,fly:.5,magic:.5}),
+  c("Ryu",{vg:1,human:1,martial:1,japanese:1,strength:.6}),
+  c("Doomguy",{vg:1,human:1,armor:1,gun:1,mask:1,strength:1}),
+  c("Goku",{anime:1,martial:1,fly:1,strength:1,japanese:1,human:.5,magic:.6,hairColor:.6}),
+  c("Naruto",{anime:1,human:1,martial:1,magic:.7,japanese:1,hairColor:1}),
+  c("Luffy",{anime:1,human:1,strength:1,japanese:1,magic:.6}),
+  c("Saitama",{anime:1,human:1,martial:1,strength:1,japanese:1}),
+  c("Eren Yeager",{anime:1,human:1,japanese:1,giant:.6}),
+  c("Levi",{anime:1,human:1,japanese:1,sword:.7,strength:.7}),
+  c("Mikasa",{anime:1,human:1,female:1,japanese:1,sword:.7,strength:.7}),
+  c("Light Yagami",{anime:1,human:1,villain:1,japanese:1,magic:.5}),
+  c("Tanjiro",{anime:1,human:1,sword:1,japanese:1,magic:.5}),
+  c("Batman",{movie:1,human:1,mask:1,cape:1}),
+  c("Homem de Ferro",{movie:1,human:1,armor:1,fly:1,mask:1,strength:.7,gun:.5}),
+  c("Homem-Aranha",{movie:1,human:1,mask:1,strength:1,magic:.5}),
+  c("Darth Vader",{movie:1,sword:1,villain:1,mask:1,cape:1,magic:.8,human:.7,strength:.7}),
+  c("Coringa",{movie:1,human:1,villain:1,hairColor:1}),
+  c("Harry Potter",{movie:1,human:1,magic:1}),
+  c("Gandalf",{movie:1,magic:1,sword:.6,human:.7,hairColor:.4}),
+  c("Optimus Prime",{movie:1,robot:1,giant:1,strength:1,gun:.6}),
+  c("Mulher-Maravilha",{movie:1,human:1,female:1,sword:1,strength:1,magic:.6,fly:.6})
+];
+
+const LIK = {yes:p=>.05+.9*p,pyes:p=>.25+.5*p,idk:_=>1,pno:p=>.25+.5*(1-p),no:p=>.05+.9*(1-p)};
+const trait = (ch,id)=> ch.t[id] ?? 0;
+
+let state, useLLM=true;
+
+async function llm(messages,opts={}){
+  const r = await fetch("/api/llm",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages,...opts})});
+  if(!r.ok) throw new Error("http "+r.status);
+  const d = await r.json();
+  if(d.error) throw new Error(d.error);
+  return d.text;
+}
+function setStatus(ok){
+  const dot=$("dot"),txt=$("status-text");
+  if(!useLLM){dot.className="dot";txt.textContent="LLM desligado";return;}
+  dot.className="dot "+(ok?"on":"off");
+  txt.textContent = ok ? "LLM ativo" : "LLM offline · usando Bayes";
+}
+
+async function phrase(canonical){
+  if(!useLLM) return canonical;
+  try{
+    const t = await llm([
+      {role:"system",content:"Você reescreve perguntas de sim/não para um jogo de adivinhação. Responda APENAS com a pergunta reescrita, curta, natural, em português, terminando com ponto de interrogação. Sem aspas, sem comentários, mantendo o mesmo significado."},
+      {role:"user",content:canonical}
+    ],{max_tokens:40,temperature:.9});
+    setStatus(true);
+    return t.trim().replace(/^["']+|["']+$/g,"") || canonical;
+  }catch(e){ setStatus(false); return canonical; }
+}
+async function reveal(name,pct){
+  if(!useLLM) return `Acho que você está pensando em ${name}…`;
+  try{
+    const t = await llm([
+      {role:"system",content:"Você é um oráculo místico e teatral. Em uma única frase curta em português, anuncie de forma dramática que adivinhou o personagem. Cite o nome. Sem aspas."},
+      {role:"user",content:`Personagem: ${name}. Confiança: ${pct}%.`}
+    ],{max_tokens:60,temperature:1});
+    setStatus(true);
+    return t.trim().replace(/^["']+|["']+$/g,"");
+  }catch(e){ setStatus(false); return `Acho que você está pensando em ${name}…`; }
+}
+async function learnTraits(name){
+  const list = Q.map(q=>`${q[0]}: ${q[1]}`).join("\n");
+  const t = await llm([
+    {role:"system",content:"Você preenche fichas de personagens. Responda APENAS um objeto JSON em que cada chave é o id do atributo e o valor é a probabilidade de 0 a 1 do personagem ter aquele atributo. Nada de texto fora do JSON."},
+    {role:"user",content:`Personagem: ${name}\nAtributos:\n${list}`}
+  ],{json_mode:true,max_tokens:400,temperature:.2});
+  return JSON.parse(t);
+}
+function fromAnswers(){
+  const t={}; state.answers.forEach(a=>{t[a.id]=({yes:1,pyes:.75,idk:.5,pno:.25,no:0})[a.val];}); return t;
+}
+
+function reset(){
+  state={w:CHARACTERS.map(()=>1/CHARACTERS.length),asked:new Set(),answers:[],count:0,qid:null,ruledOut:new Set()};
+}
+function normalize(){let s=state.w.reduce((a,b)=>a+b,0)||1;state.w=state.w.map(x=>x/s);}
+function topList(){return CHARACTERS.map((ch,i)=>({ch,i,w:state.ruledOut.has(i)?0:state.w[i]})).sort((a,b)=>b.w-a.w);}
+function pickQuestion(){
+  let best=null,bestGap=99;
+  for(let qi=0;qi<Q.length;qi++){
+    const id=Q[qi][0]; if(state.asked.has(id)) continue;
+    let split=0;
+    for(let i=0;i<CHARACTERS.length;i++){ if(state.ruledOut.has(i)) continue; split+=state.w[i]*trait(CHARACTERS[i],id); }
+    const gap=Math.abs(split-.5);
+    if(gap<bestGap){bestGap=gap;best=id;}
+  }
+  return best;
+}
+function shouldGuess(){
+  const top=topList()[0];
+  if(!top||top.w===0) return true;
+  if(top.w>=0.93) return true;
+  if(state.count>=5 && top.w>=0.80) return true;
+  return false;
+}
+
+const $=id=>document.getElementById(id);
+const screens=["start","game","guess","win","learn","taught"];
+function show(name){screens.forEach(s=>$("screen-"+s).classList.toggle("hidden",s!==name));}
+function answersDisabled(v){document.querySelectorAll("#answers .btn").forEach(b=>b.disabled=v);}
+
+async function renderQuestion(){
+  state.qid=pickQuestion();
+  if(state.qid===null){doGuess();return;}
+  const canonical=Q.find(x=>x[0]===state.qid)[1];
+  $("qcount").textContent="Pergunta "+(state.count+1);
+  renderPanel(); show("game");
+  if(useLLM){
+    $("question").innerHTML='<span class="thinking">🔮 formulando…</span>';
+    answersDisabled(true);
+    const text=await phrase(canonical);
+    $("question").textContent=text;
+    answersDisabled(false);
+  }else{
+    setStatus(false);
+    $("question").textContent=canonical;
+  }
+}
+function renderPanel(){
+  const list=topList().slice(0,4);
+  $("conf-readout").textContent=Math.round(list[0].w*100)+"%";
+  $("suspects").innerHTML=list.map(o=>{
+    const pct=Math.round(o.w*100);
+    return `<div class="suspect"><div class="suspect-row"><span class="suspect-name">${o.ch.name}</span><span class="suspect-pct">${pct}%</span></div><div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div></div>`;
+  }).join("");
+}
+function answer(val){
+  const id=state.qid;
+  for(let i=0;i<CHARACTERS.length;i++) state.w[i]*=LIK[val](trait(CHARACTERS[i],id));
+  normalize();
+  state.asked.add(id); state.answers.push({id,val}); state.count++;
+  if(shouldGuess()) doGuess(); else renderQuestion();
+}
+async function doGuess(){
+  const top=topList().find(o=>!state.ruledOut.has(o.i));
+  if(!top||top.w===0){show("learn");return;}
+  state.current=top;
+  $("guess-name").textContent=top.ch.name;
+  $("guess-conf").textContent="confiança "+Math.round(top.w*100)+"%";
+  show("guess");
+  if(useLLM){
+    $("guess-lead").innerHTML='<span class="thinking">🔮 consultando os astros…</span>';
+    $("guess-lead").textContent=await reveal(top.ch.name,Math.round(top.w*100));
+  }else{
+    $("guess-lead").textContent="Acho que você está pensando em…";
+  }
+}
+function guessYes(){
+  $("win-questions").textContent=state.count;
+  $("win-conf").textContent=Math.round(state.current.w*100)+"%";
+  show("win");
+}
+function guessNo(){
+  state.ruledOut.add(state.current.i); state.w[state.current.i]=0; normalize();
+  if(pickQuestion()!==null && topList()[0].w>0) renderQuestion(); else show("learn");
+}
+async function teach(name){
+  name=name.trim(); if(!name) return;
+  $("btn-teach").disabled=true; $("btn-teach").textContent="montando ficha…";
+  let raw={};
+  if(useLLM){ try{ raw=await learnTraits(name); setStatus(true);}catch(e){ setStatus(false); raw=fromAnswers(); } }
+  else raw=fromAnswers();
+  const t={};
+  Q.forEach(q=>{const v=raw[q[0]]; if(typeof v==="number" && isFinite(v)) t[q[0]]=Math.max(0,Math.min(1,v));});
+  CHARACTERS.push(c(name,t));
+  $("btn-teach").disabled=false; $("btn-teach").textContent="Ensinar o oráculo";
+  $("taught-lead").innerHTML=`Obrigado. <strong>${name}</strong> agora faz parte da minha mente.`;
+  show("taught");
+}
+
+$("llm-toggle").addEventListener("change",e=>{useLLM=e.target.checked;setStatus(false);});
+$("btn-start").onclick=()=>{reset();renderQuestion();};
+$("btn-again").onclick=()=>{reset();renderQuestion();};
+$("btn-again-2").onclick=()=>{reset();renderQuestion();};
+document.querySelectorAll("[data-ans]").forEach(b=>b.onclick=()=>answer(b.dataset.ans));
+$("guess-yes").onclick=guessYes;
+$("guess-no").onclick=guessNo;
+$("btn-teach").onclick=()=>teach($("learn-input").value);
+$("btn-skip").onclick=()=>{reset();renderQuestion();};
+$("learn-input").addEventListener("keydown",e=>{if(e.key==="Enter")teach(e.target.value);});
+setStatus(false);
+</script>
+</body>
+</html>
